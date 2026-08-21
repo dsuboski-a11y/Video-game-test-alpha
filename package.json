@@ -14,7 +14,8 @@
     "icons": "node scripts/make-icons.mjs",
     "signal": "node server/signal.mjs",
     "netcheck": "node scripts/nettest.mjs",
-    "spritesheet": "node scripts/spritesheet.mjs"
+    "spritesheet": "node scripts/spritesheet.mjs",
+    "single": "npm run build && node scripts/single-file.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

@@ -13,6 +13,7 @@ import * as C from './sim/constants';
 import { createContext, step, type SimContext } from './sim/step';
 import type { Command, GameState, MechInput, OrderId, PlayerId, UnitTypeId } from './sim/types';
 import { createGame } from './sim/world';
+import { Coach } from './ui/coach';
 import { Hud } from './ui/hud';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
@@ -36,6 +37,7 @@ export class Game {
   private controls = new Controls(uiRoot);
   private audio = new Audio();
   private hud: Hud;
+  private coach: Coach;
   private fxRng = new Rng(7);
 
   me: PlayerId = 0;
@@ -57,6 +59,8 @@ export class Game {
       onRewriteOrder: (order) => { this.pendingOrder = order; },
       onRestart: () => this.leaveToTitle(),
     });
+
+    this.coach = new Coach(uiRoot);
 
     window.addEventListener('resize', () => this.renderer.resize());
     window.addEventListener('orientationchange', () => setTimeout(() => this.renderer.resize(), 250));
@@ -94,8 +98,11 @@ export class Game {
     diffWrap.append(mk('CADET', 'CADET'), mk('OFFICER', 'OFFICER'), mk('MARSHAL', 'MARSHAL'));
     box.appendChild(diffWrap);
 
-    const solo = el('button', undefined, 'SKIRMISH vs AI') as HTMLButtonElement;
-    solo.onclick = () => { this.audio.unlock(); box.remove(); this.startSolo(); };
+    const first = !localStorage.getItem('ek.played');
+    const solo = el('button', undefined,
+      first ? 'PLAY — LEARN IN 60 SECONDS' : 'SKIRMISH vs AI') as HTMLButtonElement;
+    solo.id = 'play';
+    solo.onclick = () => { this.audio.unlock(); box.remove(); this.startSolo(first); };
 
     const row = el('div', 'stats');
     const host = el('button', 'ghost', 'HOST A GAME') as HTMLButtonElement;
@@ -119,6 +126,7 @@ export class Game {
   private leaveToTitle(): void {
     this.net?.close();
     this.net = null;
+    this.coach.stop();
     this.hud.clearEnd();
     this.hud.closeSheet();
     this.showTitle();
@@ -202,11 +210,11 @@ export class Game {
   }
 
   // ------------------------------------------------------------- matches ---
-  private startSolo(): void {
-    this.startMatch((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0, 'SOLO', 0);
+  private startSolo(teach = false): void {
+    this.startMatch((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0, 'SOLO', 0, teach);
   }
 
-  private startMatch(seed: number, mode: Mode, slot: PlayerId): void {
+  private startMatch(seed: number, mode: Mode, slot: PlayerId, teach = false): void {
     this.hud.clearEnd();
     this.hud.closeSheet();
     this.mode = mode;
@@ -221,9 +229,15 @@ export class Game {
     const m = this.state.mechs[this.me];
     const p = toScreen(m.x, m.y);
     this.cam.follow(p.x, p.y, projectedBounds(this.state.map), true);
-    this.hud.toast(mode === 'NET'
-      ? `LINK ESTABLISHED — YOU ARE ${slot === 0 ? 'TEAL' : 'AMBER'}`
-      : 'TAKE OUTPOSTS. THEY PAY FOR THE WAR.', 3200);
+    this.coach.stop();
+    if (teach) {
+      this.coach.start(this.state, this.me);
+      try { localStorage.setItem('ek.played', '1'); } catch { /* private mode */ }
+    } else {
+      this.hud.toast(mode === 'NET'
+        ? `LINK ESTABLISHED — YOU ARE ${slot === 0 ? 'TEAL' : 'AMBER'}`
+        : 'TAKE OUTPOSTS. THEY PAY FOR THE WAR.', 3200);
+    }
 
     if (!this.running) {
       this.running = true;
@@ -335,6 +349,7 @@ export class Game {
 
   private afterStep(cmds: Command[]): void {
     step(this.state, cmds, this.sim);
+    this.coach.tick(this.state);
     this.consumeEvents();
     this.hud.update(this.state, this.me, this.atFriendlyBase());
     if (this.state.winner !== null) {
@@ -395,7 +410,8 @@ const game = new Game();
 // state rather than inferring it from pixels. Read-only, and costs nothing.
 (window as unknown as { __EK: unknown }).__EK = game;
 
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+const wantsSW = (window as unknown as { __EK_SW?: boolean }).__EK_SW !== false;
+if ('serviceWorker' in navigator && import.meta.env.PROD && wantsSW) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(() => { /* offline is a bonus */ });
   });

@@ -12,6 +12,17 @@ and balance).
 
 ---
 
+## Play it right now, on a phone
+
+```bash
+npm install
+npm run single      # -> dist/eisenkrieg.html, one self-contained file
+```
+
+That file is the whole game: no server, no assets, no network. Open it from
+anywhere — a static host, an email attachment, a published page — and it runs.
+First launch offers a coached start that teaches the loop in about a minute.
+
 ## Play it
 
 ```bash
@@ -29,7 +40,11 @@ Network URL directly. Landscape, twin-thumb controls.
 The view is 3/4 isometric; the stick steers in screen space, so pushing up on
 the thumbstick moves the commander up the screen regardless of the camera angle.
 
-## Play against another person
+## Play against another person (same room)
+
+Head-to-head needs the lobby, because two phones have to find each other:
+
+
 
 ```bash
 npm run signal     # the lobby server, port 8787 — leave it running

@@ -15,8 +15,15 @@ const ctx = await browser.newContext({
 const page = await ctx.newPage();
 
 const errors = [];
-page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
-page.on('response', (r) => { if (r.status() >= 400) errors.push(`http ${r.status()}: ${r.url()}`); });
+page.on('console', (m) => {
+  // A bare-served single file has no /favicon.ico and the browser asks anyway;
+  // in a real deployment the favicon comes from the host page.
+  const where = m.location()?.url ?? '';
+  if (m.type() === 'error' && !/favicon/i.test(m.text() + where)) errors.push(`console: ${m.text()}`);
+});
+page.on('response', (r) => {
+  if (r.status() >= 400 && !/favicon/i.test(r.url())) errors.push(`http ${r.status()}: ${r.url()}`);
+});
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 
 await page.goto(URL_BASE, { waitUntil: 'networkidle' });
@@ -24,9 +31,15 @@ await page.waitForTimeout(400);
 await page.screenshot({ path: `${OUT}/01-title.png` });
 
 // Enter the match.
-await page.getByText('SKIRMISH vs AI', { exact: true }).click();
+// First run shows the coached entry point; later runs the plain one.
+await page.locator('#play').click();
 await page.waitForTimeout(1200);
 await page.screenshot({ path: `${OUT}/02-start.png` });
+
+const coachStep = () => page.locator('.coach .n').textContent().catch(() => null);
+if (await page.locator('.coach').count()) {
+  if ((await coachStep()) !== '1/7') errors.push('coach did not open on step 1');
+}
 
 // Open the build sheet while still standing on the HQ pad.
 await page.locator('.btn.build').click();
@@ -50,8 +63,8 @@ const before = await page.evaluate(() => {
 });
 await page.mouse.move(180, 260);
 await page.mouse.down();
-await page.mouse.move(250, 230, { steps: 12 });
-await page.waitForTimeout(1500);
+await page.mouse.move(260, 210, { steps: 12 });
+await page.waitForTimeout(2600);
 await page.mouse.up();
 const after = await page.evaluate(() => {
   const m = window.__EK.state.mechs[0];
@@ -60,6 +73,12 @@ const after = await page.evaluate(() => {
 const moved = Math.hypot(after[0] - before[0], after[1] - before[1]);
 console.log('stick moved the mech', moved.toFixed(1), 'world units');
 if (moved < 20) errors.push(`virtual stick did not move the mech (${moved.toFixed(1)} units)`);
+// Moving is the coach's first task; it must notice and move on by itself.
+if (await page.locator('.coach').count()) {
+  const step = await coachStep();
+  console.log('coach advanced to', step);
+  if (step === '1/7') errors.push('coach never registered that the player moved');
+}
 
 // Let the match run so the bot and unit AI actually exercise themselves.
 await page.waitForTimeout(6000);
