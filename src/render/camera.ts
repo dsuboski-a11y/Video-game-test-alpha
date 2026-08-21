@@ -1,5 +1,7 @@
 import { clamp, lerp } from '../core/vec';
 
+export interface Bounds { x0: number; y0: number; x1: number; y1: number; }
+
 export class Camera {
   x = 0; y = 0; zoom = 0.8;
   private shake = 0;
@@ -10,19 +12,23 @@ export class Camera {
   resize(w: number, h: number): void {
     this.viewW = w; this.viewH = h;
     // Show a fixed slice of the world regardless of device, so a small phone
-    // is not a competitive disadvantage — it just renders smaller.
-    const target = 900;
-    this.zoom = clamp(Math.max(w, h * 1.9) / target, 0.5, 1.9);
+    // is not a competitive disadvantage — it just renders smaller. The target
+    // is in *projected* units, which are roughly half world units on the x
+    // axis once the dimetric transform is applied.
+    const target = 1150;
+    this.zoom = clamp(Math.max(w, h * 2.4) / target, 0.35, 1.4);
   }
 
-  follow(tx: number, ty: number, worldW: number, worldH: number, snap = false): void {
+  /** Follow a point in projected space, clamped to the map's projected box. */
+  follow(tx: number, ty: number, b: Bounds, snap = false): void {
     const k = snap ? 1 : 0.14;
     this.x = lerp(this.x, tx, k);
     this.y = lerp(this.y, ty, k);
     const halfW = this.viewW / 2 / this.zoom;
     const halfH = this.viewH / 2 / this.zoom;
-    this.x = worldW <= halfW * 2 ? worldW / 2 : clamp(this.x, halfW, worldW - halfW);
-    this.y = worldH <= halfH * 2 ? worldH / 2 : clamp(this.y, halfH, worldH - halfH);
+    const w = b.x1 - b.x0, h = b.y1 - b.y0;
+    this.x = w <= halfW * 2 ? (b.x0 + b.x1) / 2 : clamp(this.x, b.x0 + halfW, b.x1 - halfW);
+    this.y = h <= halfH * 2 ? (b.y0 + b.y1) / 2 : clamp(this.y, b.y0 + halfH, b.y1 - halfH);
   }
 
   addShake(amount: number): void { this.shake = Math.min(18, this.shake + amount); }

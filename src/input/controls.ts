@@ -28,6 +28,14 @@ export class Controls {
   private stickZone = 0.5;
 
   constructor(private root: HTMLElement) {
+    // The HUD root is pointer-events:none so the canvas shows through, which
+    // means empty screen never delivers a pointerdown to it. The stick needs
+    // its own always-on capture layer, stacked below every HUD control so the
+    // buttons still win the hit test.
+    const layer = document.createElement('div');
+    layer.className = 'touchlayer';
+    root.appendChild(layer);
+
     this.stickEl = document.createElement('div');
     this.stickEl.className = 'stick';
     this.knobEl = document.createElement('div');
@@ -36,10 +44,12 @@ export class Controls {
     this.stickEl.style.display = 'none';
     root.appendChild(this.stickEl);
 
-    root.addEventListener('pointerdown', this.onDown, { passive: false });
-    root.addEventListener('pointermove', this.onMove, { passive: false });
-    root.addEventListener('pointerup', this.onUp, { passive: false });
-    root.addEventListener('pointercancel', this.onUp, { passive: false });
+    layer.addEventListener('pointerdown', this.onDown, { passive: false });
+    // Move and release go on the window: a thumb that slides off the layer,
+    // or lifts over a button, must still steer and still release.
+    window.addEventListener('pointermove', this.onMove, { passive: false });
+    window.addEventListener('pointerup', this.onUp, { passive: false });
+    window.addEventListener('pointercancel', this.onUp, { passive: false });
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('contextmenu', (e) => e.preventDefault());

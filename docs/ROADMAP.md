@@ -5,35 +5,50 @@ and a recommendation, not a wish list.
 
 ---
 
-## Phase 1 — Two phones, same room *(next up)*
+## Phase 1 — Two phones, same room *(built)*
 
-The single highest-value feature, and the one the MVP was architected for.
+**Done.** Room-code lobby, WebRTC data channel, deterministic lockstep, and a
+two-browser test that proves both peers land on the same state. What follows is
+what was actually built, and what it cost.
 
-The simulation already takes `(state, Command[])` and nothing else. Multiplayer
-is therefore not a rewrite; it is an input-transport problem.
+The simulation already took `(state, Command[])` and nothing else, so this was
+an input-transport problem rather than a rewrite — the prediction held.
+
+**What shipped:** `server/signal.mjs` (a ~120-line WebSocket switchboard),
+`src/net/protocol.ts` (the wire format and the command expansion),
+`src/net/session.ts` (signalling, peer setup, input buffers, checksums), and
+`src/sim/checksum.ts`. Roughly 500 lines total, and the simulation itself was
+not touched.
+
+**Measured:** two headless browsers, real WebRTC, 15 seconds of play with both
+sticks driven and a unit purchased on one side — both peers finished on the
+same tick with identical commander positions, identical economies, and no
+desync reported.
 
 **Deterministic lockstep.** Peers exchange *inputs*, never entity state. Each
-tick carries at most a handful of commands per player — a stick vector, three
-button bits, an occasional buy. That is **tens of bytes per tick regardless of
-army size**, versus kilobytes for state replication. A 50-unit battle costs
-exactly as much bandwidth as an empty map.
+tick carries a stick vector, three button bits, and an occasional buy — **tens
+of bytes per tick regardless of army size**, versus kilobytes for state
+replication. A 50-unit battle costs exactly as much bandwidth as an empty map.
 
-**Transport: WebRTC DataChannel**, unreliable-unordered, with a small input
-delay buffer (2–3 ticks ≈ 66–100 ms) and re-sending of unacknowledged inputs.
-No relay server in the data path, so a match between two phones on the same Wi-Fi
-runs at LAN latency.
+**Transport: WebRTC DataChannel**, unreliable and unordered on purpose. For
+lockstep, a retransmitted packet that arrives late is *worse* than one that never
+arrives, because the tick it carries has already been covered. So instead of
+retransmit logic, every packet carries a sliding window of the last 12 ticks:
+any loss burst shorter than that heals itself with no round trip.
 
-**Pairing, in order of how it should feel:**
+**Input delay is 3 ticks (100 ms).** When the peer's input for a tick has not
+arrived, the simulation simply does not advance. A lockstep simulation that
+guesses is a lockstep simulation that desyncs.
 
-| Method | How | Effort |
-|---|---|---|
-| **Room code** | Four characters, typed or read aloud. Signalling server matches them and hands over SDP. | Small |
-| **QR code** | Host shows a code, guest points camera. Same signalling path. | Small |
-| **Nearby** | Same-LAN discovery via the signalling server grouping by public IP. "Players near you: 1." | Medium |
+**One deadlock worth knowing about.** If both peers lose a packet at the same
+moment, each stalls waiting for a tick the other already produced — and because
+neither advances, neither ever sends another packet to carry the missing frame.
+The fix is a heartbeat: a stalled peer rebroadcasts its window every few ticks.
+Without it, simultaneous loss is an unrecoverable freeze.
 
-Recommendation: **room code first**, QR immediately after. Both need the same
-signalling server, which is ~150 lines of WebSocket relay and can run on a free
-tier indefinitely.
+**Pairing** is a four-character room code, read aloud or sent. QR (host shows,
+guest scans, same signalling path) is a small addition on top and still worth
+doing.
 
 **The determinism risk, stated honestly.** Lockstep desyncs if two devices
 compute different numbers. JavaScript's `Math.hypot`, `Math.atan2`, and friends
@@ -41,8 +56,9 @@ are *not* guaranteed bit-identical across engines — an iPhone on JavaScriptCor
 and an Android on V8 can diverge. Mitigations, in order of cost:
 
 1. **Checksum the state every 30 ticks** and surface a desync immediately rather
-   than letting two players diverge silently for two minutes. Cheap, do it
-   regardless — it turns a mystery into a bug report.
+   than letting two players diverge silently for two minutes. **Built** —
+   `src/sim/checksum.ts` hashes positions quantised to 1/256 of a world unit,
+   peers compare, and a mismatch voids the match with the tick number attached.
 2. **Replace transcendentals in the sim with lookup tables and integer math.**
    The sim only really needs `atan2`, `hypot`, `sin`, `cos`. Bounded work.
 3. **Fixed-point positions.** The real fix if 1 and 2 are not enough. Larger
@@ -165,7 +181,14 @@ worth more than a store listing.
 
 Honest list of what is not done:
 
-- **Single-player only.** No netcode yet — that is Phase 1.
+- **No TURN server.** Same-network play works today. Cross-network play needs a
+  relay deployed for the ~10-15% of connections that cannot hole-punch.
+- **Float determinism is unproven across engines.** Both peers in the test were
+  the same Chromium build. An iPhone on JavaScriptCore against an Android on V8
+  is the case that matters and has not been measured. The checksum will catch
+  it; the fixes (lookup tables, then fixed point) are scoped in Phase 1 above.
+- **Two players only.** No spectating, no reconnect, no rematch without
+  re-pairing.
 - **One map layout.** Terrain varies by seed; base positions do not.
 - **No tutorial.** There is a title-screen briefing and a first toast, which is
   not the same thing.

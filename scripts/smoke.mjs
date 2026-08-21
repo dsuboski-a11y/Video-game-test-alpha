@@ -24,7 +24,7 @@ await page.waitForTimeout(400);
 await page.screenshot({ path: `${OUT}/01-title.png` });
 
 // Enter the match.
-await page.getByText('DEPLOY', { exact: true }).click();
+await page.getByText('SKIRMISH vs AI', { exact: true }).click();
 await page.waitForTimeout(1200);
 await page.screenshot({ path: `${OUT}/02-start.png` });
 
@@ -43,12 +43,23 @@ if (await infantry.count()) {
   await page.waitForTimeout(300);
 }
 
-// Now drive the mech around with the virtual stick.
+// Now drive the mech around with the virtual stick, and prove it responded.
+const before = await page.evaluate(() => {
+  const m = window.__EK.state.mechs[0];
+  return [m.x, m.y];
+});
 await page.mouse.move(180, 260);
 await page.mouse.down();
 await page.mouse.move(250, 230, { steps: 12 });
 await page.waitForTimeout(1500);
 await page.mouse.up();
+const after = await page.evaluate(() => {
+  const m = window.__EK.state.mechs[0];
+  return [m.x, m.y];
+});
+const moved = Math.hypot(after[0] - before[0], after[1] - before[1]);
+console.log('stick moved the mech', moved.toFixed(1), 'world units');
+if (moved < 20) errors.push(`virtual stick did not move the mech (${moved.toFixed(1)} units)`);
 
 // Let the match run so the bot and unit AI actually exercise themselves.
 await page.waitForTimeout(6000);

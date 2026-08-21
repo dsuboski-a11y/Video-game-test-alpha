@@ -9,6 +9,7 @@ export const CSS = `
 #ui{font:600 13px/1.2 ui-monospace,"SF Mono",Menlo,Consolas,monospace;letter-spacing:.02em}
 
 /* ---------------------------------------------------------------- stick --- */
+.touchlayer{position:absolute;inset:0;z-index:1;touch-action:none}
 .stick{position:absolute;width:104px;height:104px;margin:-52px 0 0 -52px;border-radius:50%;
   border:2px solid rgba(120,180,255,.28);background:rgba(10,18,32,.30);pointer-events:none;z-index:5}
 .knob{position:absolute;left:50%;top:50%;width:46px;height:46px;border-radius:50%;

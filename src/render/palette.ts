@@ -5,13 +5,13 @@ export const PAL = {
   // Four near-identical shades per terrain, picked by a spatial hash. Enough
   // variation to break up a large field, small enough that it never reads as
   // a pattern.
-  water: ['#0b1a35', '#0d1e3c', '#102343', '#0c1b38'],
-  plains: ['#111a24', '#141f2b', '#17232f', '#121c27'],
-  rough: ['#1d222e', '#202634', '#232937', '#1f2531'],
+  water: ['#123a6b', '#154577', '#1a5089', '#134070'],
+  plains: ['#27362c', '#2c3d30', '#314434', '#2a3a2e'],
+  rough: ['#3d372f', '#453e34', '#4c453a', '#413a31'],
   grid: 'rgba(120,180,255,0.045)',
   contour: 'rgba(140,200,255,0.10)',
-  shore: 'rgba(126,196,255,0.30)',
-  speck: 'rgba(150,190,235,0.10)',
+  shore: 'rgba(150,215,255,0.42)',
+  speck: 'rgba(190,215,180,0.13)',
 
   neutral: '#9fb0c6',
   neutralDim: '#4a5260',

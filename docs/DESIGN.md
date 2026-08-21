@@ -94,7 +94,37 @@ Income is `20/s` for your HQ plus `12/s` per outpost. At two bases you make
 survivable, and the losing player can always afford infantry — which is the
 unit that reverses a snowball.
 
-### 6. Built for one person on one phone
+### 6. The camera is 3/4 isometric
+
+The original was flat top-down, because a Mega Drive rendering two split-screen
+views had nothing spare. A dimetric (2:1) projection costs us nothing and buys
+a great deal:
+
+- **Terrain has relief.** Rough ground stands ~15 px proud and casts real cliff
+  faces; water sits ~12 px sunken. Lakes and mesas read as obstacles at a glance
+  instead of as coloured rectangles.
+- **Units are solids, not icons.** Every unit is an extruded box with a lit top
+  and two shaded side faces, drawn back-to-front by `x + y`. A tank in front of
+  your commander actually occludes it.
+- **Altitude is free information.** A jet flies 58 px above its own shadow, with
+  a dotted mast connecting the two. You never read a UI element to know which
+  layer someone is on — which matters, because the layer *is* the matchup.
+
+Three implementation notes worth keeping:
+
+- **The simulation never learns about any of this.** It stays flat and
+  top-down. Projection lives in `src/render/iso.ts`, and the only other place
+  that knows the camera angle exists is the one line in `main.ts` that rotates
+  the thumbstick from screen space into world space. That separation is what
+  keeps the netcode shipping plain world coordinates.
+- **Elevation is visual only.** Pathing, ranges, and capture radii are unchanged,
+  so the camera angle can never affect balance — or desync a match.
+- **Terrain is drawn in three elevation bands** (water, plains, rough), each
+  batched into a handful of fills. That is ~18 canvas fills per frame instead of
+  one per visible tile, which is the difference between smooth and unplayable
+  on a phone.
+
+### 7. Built for one person on one phone
 
 - **Split-screen is gone.** Two players means two devices.
 - **Twin-thumb controls**: a floating stick under the left thumb (origin lands
@@ -186,10 +216,60 @@ After both fixes, mirror matches run 15/15, 20/20, 21/19 across difficulties.
 Neither bug was findable by playing; both were trivial to find by asserting that
 `field(base A)` mirrored equals `field(base A')`.
 
+### Netcode, and what the architecture actually bought
+
+Multiplayer is deterministic lockstep over a WebRTC data channel. Peers exchange
+`TickInput` records — a quantised stick vector, three button bits, an optional
+buy — and expand them into the same `Command[]` the solo game already used. The
+simulation was not modified at all to support it.
+
+```
+src/net/protocol.ts   wire format; TickInput -> Command[] in a fixed order
+src/net/session.ts    signalling, peer setup, input buffers, checksums
+src/sim/checksum.ts   FNV-1a over the state that drives the match
+server/signal.mjs     room-code lobby; relays the handshake, then bows out
+```
+
+The claim in the first version of this document was that multiplayer would be an
+input-transport problem rather than a rewrite. That held: ~500 new lines, zero
+changes to `src/sim/step.ts`.
+
+Three decisions worth recording:
+
+- **The channel is unreliable and unordered on purpose.** A retransmitted packet
+  that arrives late is worse than one that never arrives. Every packet instead
+  carries a 12-tick sliding window, so short loss bursts heal with no round trip.
+- **A stalled peer must keep talking.** If both peers drop a packet at the same
+  moment, each waits for a tick the other already produced, and because neither
+  advances, neither sends again. That is a permanent freeze. A heartbeat while
+  stalled is the whole fix, and it is not obvious until it happens.
+- **Command order is fixed by player index**, not by arrival order. Two peers
+  building their command list in different orders would desync within seconds.
+
 ### Testing
 
 - `npm run typecheck` — strict TypeScript, no `any` in the simulation.
 - `npm run selfplay -- 30 OFFICER` — balance and match-length statistics.
 - `npm run smoke` — boots the built game in headless Chromium at iPhone
   landscape resolution, plays it, and fails on any console error, any HTTP
-  error, or a stalled capture loop.
+  error, a stalled capture loop, or a thumbstick that does not move the mech.
+- `npm run netcheck` — starts the lobby, opens two headless browsers, pairs them
+  by room code over real WebRTC, drives both sticks, buys a unit on one side,
+  and asserts both peers finish on the same tick with identical commander
+  positions and no desync.
+
+#### A third bug, caught by the netcode test
+
+The two fairness bugs above were found by asserting on simulation state. The
+netcode test found a blunter one: after fifteen seconds of dragging, **both
+commanders were still at their exact spawn coordinates**.
+
+`#ui` is `pointer-events: none` so the canvas shows through it, and `#ui > *`
+re-enables events only for actual HUD elements. The thumbstick listener was
+bound to `#ui` itself — so a thumb landing on empty screen hit nothing at all.
+The virtual joystick had never worked in any build; every screenshot had shown
+a commander parked on its own pad, and nothing had ever asserted otherwise.
+
+The fix is a dedicated full-screen capture layer stacked beneath the HUD
+controls. The lesson is the same one the fairness bugs taught: a test that only
+checks for the absence of errors will happily pass a game nobody can play.
