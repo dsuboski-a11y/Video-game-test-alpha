@@ -32,7 +32,7 @@ export class Game {
   private sim!: SimContext;
   private bot!: Bot;
   private cam = new Camera();
-  private renderer = new Renderer(canvas, this.cam);
+  readonly renderer = new Renderer(canvas, this.cam);
   private controls = new Controls(uiRoot);
   private audio = new Audio();
   private hud: Hud;

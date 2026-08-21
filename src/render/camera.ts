@@ -15,8 +15,17 @@ export class Camera {
     // is not a competitive disadvantage — it just renders smaller. The target
     // is in *projected* units, which are roughly half world units on the x
     // axis once the dimetric transform is applied.
-    const target = 1150;
-    this.zoom = clamp(Math.max(w, h * 2.4) / target, 0.35, 1.4);
+    // Sprites are baked at one pixel per projected unit, so the zoom is snapped
+    // to quarter steps: a fractional scale makes pixel art shimmer as it moves.
+    // Sprites are baked at two pixels per projected unit, so the zoom snaps to
+    // whole steps: a fractional scale makes pixel art shimmer as it scrolls,
+    // and zoom 2 lands the baked pixels exactly on screen pixels.
+    // Sprites are baked at two pixels per projected unit and drawn at half
+    // size, so at zoom 1 one baked pixel lands on one *device* pixel of a
+    // retina phone — crisp where it matters, and integer-scaled elsewhere.
+    const target = 900;
+    const raw = clamp(Math.max(w, h * 2.4) / target, 1, 3);
+    this.zoom = Math.round(raw);
   }
 
   /** Follow a point in projected space, clamped to the map's projected box. */

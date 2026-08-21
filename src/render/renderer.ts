@@ -4,10 +4,11 @@ import { UNIT_TYPES } from '../sim/constants';
 import type { Base, GameState, Mech, PlayerId, Projectile, Unit } from '../sim/types';
 import { Camera } from './camera';
 import {
-  groundDisc, heightAt, ISO_Y, JET_ALT, prism, prismColors, projectedBounds,
+  groundDisc, heightAt, isoEllipse, JET_ALT, prism, prismColors, projectedBounds,
   shade, shadow, terrainHeight, toScreen, type PrismColors,
 } from './iso';
 import { PAL, teamOf } from './palette';
+import { MORPH_FRAMES, SpriteBank } from './spritebank';
 
 /** Side-face colours for each terrain type, derived once from the top shades so
  *  the whole map is lit by the same imaginary sun. */
@@ -25,6 +26,7 @@ interface Drawable { depth: number; draw(): void; }
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
+  readonly sprites = new SpriteBank();
   dpr = 1;
   cssW = 1; cssH = 1;
 
@@ -32,6 +34,7 @@ export class Renderer {
     const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
     if (!ctx) throw new Error('2D canvas unavailable');
     this.ctx = ctx;
+    this.sprites.bake();
   }
 
   resize(): void {
@@ -47,6 +50,8 @@ export class Renderer {
   draw(state: GameState, me: PlayerId, timeMs: number): void {
     const ctx = this.ctx;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    // Everything downstream is pixel art; smoothing would turn it to mush.
+    ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = PAL.bg;
     ctx.fillRect(0, 0, this.cssW, this.cssH);
 
@@ -208,8 +213,7 @@ export class Renderer {
       ctx.save();
       ctx.globalAlpha = 0.22;
       ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.ellipse(p.x, p.y, rr, rr * ISO_Y * 2, 0, 0, Math.PI * 2);
+      isoEllipse(ctx, p.x, p.y, rr);
       ctx.fill();
       ctx.restore();
     }
@@ -282,8 +286,7 @@ export class Renderer {
       ctx.strokeStyle = teamOf(b.capture > 0 ? 0 : 1).main;
       ctx.lineWidth = 4;
       ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.ellipse(deck.x, deck.y, r + 7, (r + 7) * ISO_Y * 2, 0,
+      isoEllipse(ctx, deck.x, deck.y, r + 7,
         -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac);
       ctx.stroke();
       ctx.restore();
@@ -303,74 +306,21 @@ export class Renderer {
   // ---------------------------------------------------------------- units ---
   private drawUnit(ctx: CanvasRenderingContext2D, state: GameState, u: Unit): void {
     const def = UNIT_TYPES[u.type];
-    const col = teamOf(u.owner);
     const g = heightAt(state.map, u.x, u.y);
-    const pc = prismColors(col.main);
-    const dark = prismColors(shade(col.main, 0.55));
-    const s = def.radius;
+    shadow(ctx, u.x, u.y, g, def.radius * 1.2, 0.34);
 
-    shadow(ctx, u.x, u.y, g, s * 1.25, 0.34);
-
-    switch (u.type) {
-      case 'INFANTRY':
-        prism(ctx, u.x, u.y, g, s * 0.55, s * 0.55, s * 1.7, u.facing, pc);
-        break;
-      case 'BIKE':
-        prism(ctx, u.x, u.y, g, s * 1.2, s * 0.42, s * 1.0, u.facing, pc);
-        break;
-      case 'ARMOR':
-        prism(ctx, u.x, u.y, g, s * 1.0, s * 0.72, s * 0.85, u.facing, pc);
-        this.barrel(ctx, u.x, u.y, g + s * 0.85, u.facing, s * 1.7, col.ink);
-        break;
-      case 'TANK':
-        prism(ctx, u.x, u.y, g, s * 1.1, s * 0.85, s * 0.55, u.facing, dark);
-        prism(ctx, u.x, u.y, g + s * 0.55, s * 0.62, s * 0.58, s * 0.55, u.facing, pc);
-        this.barrel(ctx, u.x, u.y, g + s * 0.95, u.facing, s * 2.1, col.ink);
-        break;
-      case 'AA':
-        prism(ctx, u.x, u.y, g, s * 1.0, s * 0.68, s * 0.6, u.facing, pc);
-        prism(ctx, u.x, u.y, g + s * 0.6, s * 0.34, s * 0.34, s * 0.9, u.facing, dark);
-        break;
-      case 'ARTILLERY':
-        prism(ctx, u.x, u.y, g, s * 1.0, s * 0.66, s * 0.5, u.facing, dark);
-        prism(ctx, u.x - Math.cos(u.facing) * s * 0.2, u.y - Math.sin(u.facing) * s * 0.2,
-          g + s * 0.5, s * 0.7, s * 0.5, s * 0.5, u.facing, pc);
-        this.barrel(ctx, u.x, u.y, g + s * 1.05, u.facing, s * 1.9, col.ink);
-        break;
-      case 'SUPPLY': {
-        prism(ctx, u.x, u.y, g, s * 1.05, s * 0.7, s * 0.95, u.facing, pc);
-        const top = toScreen(u.x, u.y, g + s * 0.95);
-        ctx.fillStyle = '#e9f4ff';
-        ctx.fillRect(top.x - 1.5, top.y - 4, 3, 8);
-        ctx.fillRect(top.x - 4, top.y - 1.5, 8, 3);
-        break;
-      }
-    }
+    const p = toScreen(u.x, u.y, g);
+    this.sprites.drawUnit(ctx, u.type, u.owner, u.facing, p.x, p.y);
 
     if (u.hp < def.hp) {
-      const p = toScreen(u.x, u.y, g + s * 2.2);
-      const w = def.radius * 2.6;
+      const bar = toScreen(u.x, u.y, g + def.radius * 2.1);
+      const w = def.radius * 2.4;
       const f = clamp(u.hp / def.hp, 0, 1);
-      ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      ctx.fillRect(p.x - w / 2, p.y, w, 3);
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(Math.round(bar.x - w / 2), Math.round(bar.y), w, 3);
       ctx.fillStyle = f > 0.5 ? PAL.hpGood : f > 0.25 ? PAL.hpWarn : PAL.hpBad;
-      ctx.fillRect(p.x - w / 2, p.y, w * f, 3);
+      ctx.fillRect(Math.round(bar.x - w / 2), Math.round(bar.y), w * f, 3);
     }
-  }
-
-  private barrel(
-    ctx: CanvasRenderingContext2D, wx: number, wy: number, h: number,
-    facing: number, len: number, colour: string,
-  ): void {
-    const a = toScreen(wx, wy, h);
-    const b = toScreen(wx + Math.cos(facing) * len, wy + Math.sin(facing) * len, h);
-    ctx.strokeStyle = colour;
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-    ctx.stroke();
-    ctx.lineCap = 'butt';
   }
 
   // ----------------------------------------------------------------- mech ---
@@ -378,69 +328,54 @@ export class Renderer {
     ctx: CanvasRenderingContext2D, state: GameState, m: Mech, timeMs: number,
   ): void {
     const col = teamOf(m.owner);
-    const jet = m.mode === 'JET';
-    const morphing = m.morph > 0;
     const s = C.MECH_RADIUS;
     const g = heightAt(state.map, m.x, m.y);
-    const alt = jet ? g + JET_ALT : g;
-    const body = morphing ? prismColors('#f2f7ff') : prismColors(col.main);
-    const dark = prismColors(shade(col.main, 0.5));
 
-    // Shadow stays on the ground. Its distance from the body is the altitude
-    // cue — the single most important readability decision in the renderer.
-    shadow(ctx, m.x, m.y, g, s * (jet ? 0.9 : 1.15), jet ? 0.28 : 0.4);
+    // How far through the walker -> jet fold are we, as 0 (walker) to 1 (jet)?
+    // The simulation flips `mode` at the halfway point, so which direction we
+    // are folding has to be recovered from that plus the remaining timer.
+    let p: number;
+    if (m.morph > 0) {
+      const t = 1 - m.morph / C.MORPH_TICKS;
+      const half = C.MORPH_TICKS / 2;
+      const becomingJet = m.morph > half ? m.mode !== 'JET' : m.mode === 'JET';
+      p = becomingJet ? t : 1 - t;
+    } else {
+      p = m.mode === 'JET' ? 1 : 0;
+    }
+    // Altitude rides the same curve, so the machine lifts off as it folds.
+    const alt = g + JET_ALT * p;
 
-    if (jet) {
-      // A short mast connects the jet to its shadow so the eye tracks altitude.
+    shadow(ctx, m.x, m.y, g, s * (0.75 + 0.4 * (1 - p)), 0.4 - 0.12 * p);
+
+    if (p > 0.05) {
+      // A dotted mast to its own shadow: the altitude cue, and the reason you
+      // never need a UI element to know which layer someone is fighting on.
       const a = toScreen(m.x, m.y, g), b = toScreen(m.x, m.y, alt);
-      ctx.strokeStyle = 'rgba(120,180,255,0.16)';
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = `rgba(120,180,255,${0.18 * p})`;
+      ctx.lineWidth = 1;
       ctx.setLineDash([3, 5]);
       ctx.beginPath();
       ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
       ctx.stroke();
       ctx.setLineDash([]);
-
-      prism(ctx, m.x, m.y, alt, s * 1.15, s * 0.42, s * 0.42, m.facing, body);
-      // Swept wings.
-      prism(ctx, m.x - Math.cos(m.facing) * s * 0.3, m.y - Math.sin(m.facing) * s * 0.3,
-        alt + s * 0.1, s * 0.34, s * 1.15, s * 0.2, m.facing, dark);
-      const nose = toScreen(m.x + Math.cos(m.facing) * s * 1.7,
-        m.y + Math.sin(m.facing) * s * 1.7, alt + s * 0.2);
-      const l = toScreen(m.x + Math.cos(m.facing + 2.5) * s * 0.9,
-        m.y + Math.sin(m.facing + 2.5) * s * 0.9, alt + s * 0.2);
-      const r = toScreen(m.x + Math.cos(m.facing - 2.5) * s * 0.9,
-        m.y + Math.sin(m.facing - 2.5) * s * 0.9, alt + s * 0.2);
-      ctx.fillStyle = body.top;
-      ctx.beginPath();
-      ctx.moveTo(nose.x, nose.y); ctx.lineTo(l.x, l.y); ctx.lineTo(r.x, r.y);
-      ctx.closePath();
-      ctx.fill();
-    } else {
-      // Legs, torso, shoulders, cannon.
-      prism(ctx, m.x, m.y, g, s * 0.5, s * 0.7, s * 0.6, m.facing, dark);
-      prism(ctx, m.x, m.y, g + s * 0.6, s * 0.62, s * 0.75, s * 0.95, m.facing, body);
-      prism(ctx, m.x, m.y, g + s * 1.15, s * 0.42, s * 1.05, s * 0.3, m.facing, dark);
-      this.barrel(ctx, m.x, m.y, g + s * 1.25, m.facing, s * 2.0, col.ink);
-      const head = toScreen(m.x, m.y, g + s * 1.62);
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(head.x, head.y, 2.6, 0, Math.PI * 2);
-      ctx.fill();
     }
 
-    // Thruster plume.
-    const thrust = Math.hypot(m.vx, m.vy) / (jet ? C.JET_MAX_SPEED : C.WALKER_MAX_SPEED);
+    const body = toScreen(m.x, m.y, alt);
+
+    // Thruster plume, behind the hull.
+    const thrust = Math.hypot(m.vx, m.vy) /
+      (m.mode === 'JET' ? C.JET_MAX_SPEED : C.WALKER_MAX_SPEED);
     if (thrust > 0.12) {
-      const back = toScreen(m.x - Math.cos(m.facing) * s * 1.2,
-        m.y - Math.sin(m.facing) * s * 1.2, alt + s * 0.3);
-      const tail = toScreen(m.x - Math.cos(m.facing) * (s * 2.2 + thrust * 22),
-        m.y - Math.sin(m.facing) * (s * 2.2 + thrust * 22), alt + s * 0.3);
+      const back = toScreen(m.x - Math.cos(m.facing) * s * 1.1,
+        m.y - Math.sin(m.facing) * s * 1.1, alt + 4);
+      const tail = toScreen(m.x - Math.cos(m.facing) * (s * 2.0 + thrust * 22),
+        m.y - Math.sin(m.facing) * (s * 2.0 + thrust * 22), alt + 4);
       const grad = ctx.createLinearGradient(back.x, back.y, tail.x, tail.y);
       grad.addColorStop(0, col.glow);
       grad.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.strokeStyle = grad;
-      ctx.lineWidth = 6 * thrust + 2;
+      ctx.lineWidth = 5 * thrust + 2;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(back.x, back.y); ctx.lineTo(tail.x, tail.y);
@@ -448,29 +383,30 @@ export class Renderer {
       ctx.lineCap = 'butt';
     }
 
+    this.sprites.drawMech(ctx, m.owner, p * (MORPH_FRAMES - 1), m.facing, body.x, body.y);
+
+    if (m.morph > 0) {
+      // A ring that contracts through the fold, so a transformation reads even
+      // at the edge of the screen.
+      const k = Math.sin((1 - m.morph / C.MORPH_TICKS) * Math.PI);
+      ctx.save();
+      ctx.globalAlpha = k * 0.85;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      const rr = s * (0.9 + 2.0 * (1 - k));
+      isoEllipse(ctx, body.x, body.y, rr);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     if (m.carryingUnitId >= 0) {
-      const p = toScreen(m.x, m.y, alt);
-      const rr = s + 10 + Math.sin(timeMs * 0.008) * 1.5;
+      const rr = s + 14 + Math.sin(timeMs * 0.008) * 2;
       ctx.strokeStyle = col.glow;
       ctx.lineWidth = 2;
       ctx.setLineDash([4, 4]);
-      ctx.beginPath();
-      ctx.ellipse(p.x, p.y, rr, rr * ISO_Y * 2, 0, 0, Math.PI * 2);
+      isoEllipse(ctx, body.x, body.y, rr);
       ctx.stroke();
       ctx.setLineDash([]);
-    }
-
-    if (morphing) {
-      const p = toScreen(m.x, m.y, alt);
-      const rr = s + 16 - (m.morph / C.MORPH_TICKS) * 10;
-      ctx.save();
-      ctx.strokeStyle = '#ffffff';
-      ctx.globalAlpha = m.morph / C.MORPH_TICKS;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.ellipse(p.x, p.y, rr, rr * ISO_Y * 2, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
     }
   }
 
@@ -525,8 +461,7 @@ export class Renderer {
           ctx.globalAlpha = fade * 0.6;
           ctx.strokeStyle = '#ffd9a0';
           ctx.lineWidth = 2 * fade;
-          ctx.beginPath();
-          ctx.ellipse(p.x, p.y + 6, r * 1.3, r * 1.3 * ISO_Y * 2, 0, 0, Math.PI * 2);
+          isoEllipse(ctx, p.x, p.y + 6, r * 1.8);
           ctx.stroke();
           break;
         }
@@ -541,9 +476,7 @@ export class Renderer {
           ctx.globalAlpha = fade * 0.8;
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 3 * fade;
-          const r = 22 + t * 60;
-          ctx.beginPath();
-          ctx.ellipse(p.x, p.y, r, r * ISO_Y * 2, 0, 0, Math.PI * 2);
+          isoEllipse(ctx, p.x, p.y, 30 + t * 85);
           ctx.stroke();
           break;
         }
@@ -551,9 +484,7 @@ export class Renderer {
           ctx.globalAlpha = fade;
           ctx.strokeStyle = '#cfe3ff';
           ctx.lineWidth = 2;
-          const r = 30 * (1 - t);
-          ctx.beginPath();
-          ctx.ellipse(p.x, p.y, r, r * ISO_Y * 2, 0, 0, Math.PI * 2);
+          isoEllipse(ctx, p.x, p.y, 42 * (1 - t));
           ctx.stroke();
           break;
         }

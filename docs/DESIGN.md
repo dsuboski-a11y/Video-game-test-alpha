@@ -124,7 +124,35 @@ Three implementation notes worth keeping:
   one per visible tile, which is the difference between smooth and unplayable
   on a phone.
 
-### 7. Built for one person on one phone
+### 7. Sprites, and the transformation
+
+Units are pixel art now, not vector shapes — but there are no image files in the
+repo. Every sprite is **compiled at load time** from the solids in
+`render/models.ts`: the compiler projects each part, software-rasterises it with
+hard edges and a fixed material ramp, sorts by depth, and grows a one-pixel dark
+outline around the silhouette. 480 frames — 7 unit types and the commander, at
+16 facings, in two team colours — bake in about 100 ms and cost nothing to
+download.
+
+Rasterising rather than drawing vectors live is the whole point. Canvas fills
+are antialiased, so shapes drawn each frame always look soft; scanline-filling
+into an index buffer and blitting with smoothing off gives genuine chunky pixels.
+
+**The transformation is a real animation, not a cut.** The walker pose and the
+jet pose hold *the same parts in the same order*, so a frame is simply the two
+poses blended. The legs swing back and shrink into tail fins, the shoulders
+sweep out and flatten into wings, the torso stretches into a fuselage, the head
+slides forward into a nose, and the shoulder cannon tucks under a wing. Nine
+frames are baked across that fold, and the mech's altitude rides the same curve
+so it lifts off as it folds. It takes 0.7 seconds, which is long enough to watch
+and long enough that morphing in front of an enemy is a decision rather than a
+reflex.
+
+That the poses correspond part-for-part is the entire trick, and it is why the
+transformation is worth having: it is what people actually remember about the
+game it descends from.
+
+### 8. Built for one person on one phone
 
 - **Split-screen is gone.** Two players means two devices.
 - **Twin-thumb controls**: a floating stick under the left thumb (origin lands
@@ -257,6 +285,15 @@ Three decisions worth recording:
   by room code over real WebRTC, drives both sticks, buys a unit on one side,
   and asserts both peers finish on the same tick with identical commander
   positions and no desync.
+
+#### A fourth: circles are not circles
+
+A circle of world radius r on the ground plane does not project to an ellipse of
+semi-axes (r, r/2). The extreme points land on the diagonal after the shear, so
+the true semi-axes are `r·ISO_X·√2` and `r·ISO_Y·√2` — about 30% smaller. Every
+base pad, shadow, capture ring and shockwave was drawn 41% oversized, which read
+as "the HQ is enormous" rather than as a projection error. Fixed with a single
+`isoEllipse` helper that every ground-plane circle now goes through.
 
 #### A third bug, caught by the netcode test
 

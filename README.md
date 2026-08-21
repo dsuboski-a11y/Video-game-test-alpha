@@ -65,6 +65,7 @@ npm run selfplay -- 30 OFFICER      # 30 headless AI-vs-AI matches, ~9 seconds
 npm run selfplay -- 20 CADET MARSHAL
 npm run smoke                       # boots the built game in headless Chromium
 npm run netcheck                    # two real browsers, real WebRTC, one match
+npm run spritesheet                 # dump the baked sprite atlases to PNG
 ```
 
 `netcheck` starts the lobby, opens two headless browsers, has one host and the
@@ -106,4 +107,6 @@ determinism across mobile JS engines, and translation latency.
 
 Playable start to finish, solo against the AI at three difficulties **and**
 head-to-head against another person over WebRTC with a room code. Rendered in
-3/4 isometric. Known gaps are listed at the bottom of the roadmap.
+3/4 isometric with pixel-art sprites compiled at load time — including a nine
+frame walker-to-jet transformation that the commander actually folds through.
+Known gaps are listed at the bottom of the roadmap.

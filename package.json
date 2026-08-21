@@ -13,7 +13,8 @@
     "smoke": "npm run build && node scripts/smoke.mjs",
     "icons": "node scripts/make-icons.mjs",
     "signal": "node server/signal.mjs",
-    "netcheck": "node scripts/nettest.mjs"
+    "netcheck": "node scripts/nettest.mjs",
+    "spritesheet": "node scripts/spritesheet.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

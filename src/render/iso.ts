@@ -101,6 +101,25 @@ export function prism(
   ctx.fill();
 }
 
+/**
+ * A circle of world radius r, projected onto the ground plane, is an ellipse
+ * with semi-axes r*ISO_X*sqrt(2) and r*ISO_Y*sqrt(2) — the sqrt(2) comes from
+ * the circle's extreme points sitting on the diagonal after the shear. Getting
+ * this wrong draws every pad and shadow about 40% oversized, which is exactly
+ * what it did.
+ */
+export const GROUND_RX = ISO_X * Math.SQRT2;
+export const GROUND_RY = ISO_Y * Math.SQRT2;
+
+/** Path a ground-plane circle of world radius `r` at an already-projected point. */
+export function isoEllipse(
+  ctx: CanvasRenderingContext2D, px: number, py: number, r: number,
+  from = 0, to = Math.PI * 2,
+): void {
+  ctx.beginPath();
+  ctx.ellipse(px, py, r * GROUND_RX, r * GROUND_RY, 0, from, to);
+}
+
 /** Ground shadow. Its distance from the body is the only altitude cue a player
  *  needs, and it works without reading a single UI element. */
 export function shadow(
@@ -109,8 +128,7 @@ export function shadow(
 ): void {
   const p = toScreen(wx, wy, ground);
   ctx.fillStyle = `rgba(0,0,0,${alpha})`;
-  ctx.beginPath();
-  ctx.ellipse(p.x, p.y, rx, rx * ISO_Y * 2, 0, 0, Math.PI * 2);
+  isoEllipse(ctx, p.x, p.y, rx);
   ctx.fill();
 }
 
@@ -119,8 +137,7 @@ export function groundDisc(
   ctx: CanvasRenderingContext2D, wx: number, wy: number, ground: number, r: number,
 ): void {
   const p = toScreen(wx, wy, ground);
-  ctx.beginPath();
-  ctx.ellipse(p.x, p.y, r, r * ISO_Y * 2, 0, 0, Math.PI * 2);
+  isoEllipse(ctx, p.x, p.y, r);
 }
 
 /** Shade a hex colour by a multiplier. Used to derive the side faces of every

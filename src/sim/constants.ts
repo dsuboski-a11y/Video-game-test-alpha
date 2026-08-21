@@ -34,7 +34,9 @@ export const JET_TURN = 0.13;
 export const WALKER_ACCEL = 0.16;
 export const WALKER_MAX_SPEED = 1.9;
 export const WALKER_TURN = 0.30;
-export const MORPH_TICKS = 12;
+/** 0.7s. Long enough to watch the machine fold, and long enough that
+ *  transforming in front of an enemy is a decision rather than a reflex. */
+export const MORPH_TICKS = 21;
 
 export const MECH_SHOT_DAMAGE_WALKER = 15;
 export const MECH_SHOT_DAMAGE_JET = 11;
