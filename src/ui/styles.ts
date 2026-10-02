@@ -87,14 +87,17 @@ export const CSS = `
 .card .stats{font-size:9px;color:rgba(120,180,255,.75);display:flex;gap:7px;flex-wrap:wrap}
 
 /* ---------------------------------------------------------------- coach --- */
-.coach{position:absolute;top:calc(72px + var(--safeT));left:50%;transform:translateX(-50%);
-  display:flex;align-items:center;gap:10px;max-width:min(560px,calc(100vw - 220px));
-  background:rgba(8,13,22,.93);border:1px solid rgba(255,209,102,.5);border-radius:12px;
-  padding:9px 12px;z-index:9;backdrop-filter:blur(8px);box-shadow:0 6px 24px rgba(0,0,0,.45)}
-.coach.ok{border-color:rgba(93,240,138,.75)}
-.coach .n{font-size:10px;color:#ffd166;letter-spacing:.1em;flex:none}
+.coach{position:absolute;top:calc(78px + var(--safeT));left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:11px;max-width:min(600px,calc(100vw - 210px));
+  background:rgba(10,16,26,.96);border:2px solid #ffd166;border-radius:14px;
+  padding:11px 14px;z-index:9;backdrop-filter:blur(8px);
+  box-shadow:0 0 0 1px rgba(0,0,0,.5),0 8px 30px rgba(0,0,0,.6),0 0 22px rgba(255,209,102,.22);
+  animation:coachIn .35s ease}
+@keyframes coachIn{from{opacity:0;transform:translate(-50%,-10px)}to{opacity:1;transform:translate(-50%,0)}}
+.coach.ok{border-color:#5df08a;box-shadow:0 0 0 1px rgba(0,0,0,.5),0 8px 30px rgba(0,0,0,.6),0 0 22px rgba(93,240,138,.3)}
+.coach .n{font-size:11px;color:#ffd166;letter-spacing:.1em;flex:none;font-weight:700}
 .coach.ok .n{color:var(--t0)}
-.coach .t{font-size:12px;line-height:1.45;font-weight:500}
+.coach .t{font-size:13.5px;line-height:1.4;font-weight:600;color:#fff}
 .coach button{font:inherit;font-size:10px;padding:6px 9px;border-radius:8px;flex:none;
   border:1px solid var(--edge);background:rgba(255,255,255,.06);color:var(--dim)}
 

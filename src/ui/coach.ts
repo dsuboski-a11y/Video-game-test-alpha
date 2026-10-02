@@ -43,12 +43,14 @@ const STEPS: Step[] = [
       c.movedFrom.x, c.movedFrom.y) > 70,
   },
   {
-    text: 'Stand on your base and tap BUILD. Buy Infantry, and give it TAKE OUTPOST.',
+    // Step 1 ends with the player off their own pad, so this has to say so.
+    // Without the "walk back" the instruction is simply impossible to follow.
+    text: 'Walk back onto your glowing base pad, then tap BUILD. Buy Infantry, order TAKE OUTPOST.',
     done: (c) => c.state.players[c.me].unitsBuilt >= 1,
     hold: 40,
   },
   {
-    text: 'Walk onto your new infantry and tap LIFT to pick it up.',
+    text: 'Your infantry appeared on the pad. Walk onto it and tap LIFT to pick it up.',
     done: (c) => c.state.mechs[c.me].carryingUnitId >= 0,
   },
   {

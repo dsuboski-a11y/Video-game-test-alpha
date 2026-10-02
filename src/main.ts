@@ -151,7 +151,10 @@ export class Game {
           'The match starts the moment they join.'));
       } else if (phase === 'error') {
         box.appendChild(el('h1', 'lose', 'NO LINK'));
-        box.appendChild(el('p', undefined, detail));
+        box.appendChild(el('p', undefined,
+          `${detail}. Head-to-head needs a lobby server running — two phones have ` +
+          'to find each other somehow. Solo play works anywhere; tap BACK and ' +
+          'pick SKIRMISH.'));
       } else {
         box.appendChild(el('h1', undefined, phase === 'connecting' ? 'LINKING' : 'CONNECTING'));
         box.appendChild(el('p', undefined, detail || 'Contacting the lobby…'));

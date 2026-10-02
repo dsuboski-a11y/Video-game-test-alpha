@@ -12,6 +12,19 @@ and balance).
 
 ---
 
+## Send it to someone
+
+Pushing to this branch deploys the game to GitHub Pages automatically. A repo
+admin enables it once: **Settings → Pages → Build and deployment → Source:
+GitHub Actions**. After the next push the game lives at
+
+```
+https://<owner>.github.io/<repo>/
+```
+
+That is a plain link — open it on any phone, no install, no account. The
+standalone single-file copy is also published at `/eisenkrieg.html`.
+
 ## Play it right now, on a phone
 
 ```bash

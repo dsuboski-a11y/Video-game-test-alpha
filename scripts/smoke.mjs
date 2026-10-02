@@ -37,8 +37,11 @@ await page.waitForTimeout(1200);
 await page.screenshot({ path: `${OUT}/02-start.png` });
 
 const coachStep = () => page.locator('.coach .n').textContent().catch(() => null);
-if (await page.locator('.coach').count()) {
-  if ((await coachStep()) !== '1/7') errors.push('coach did not open on step 1');
+// A fresh browser context has never played, so the coach must be on screen.
+if (!(await page.locator('.coach').isVisible().catch(() => false))) {
+  errors.push('coach never appeared on a first run');
+} else if ((await coachStep()) !== '1/7') {
+  errors.push(`coach opened on the wrong step: ${await coachStep()}`);
 }
 
 // Open the build sheet while still standing on the HQ pad.
@@ -74,11 +77,9 @@ const moved = Math.hypot(after[0] - before[0], after[1] - before[1]);
 console.log('stick moved the mech', moved.toFixed(1), 'world units');
 if (moved < 20) errors.push(`virtual stick did not move the mech (${moved.toFixed(1)} units)`);
 // Moving is the coach's first task; it must notice and move on by itself.
-if (await page.locator('.coach').count()) {
-  const step = await coachStep();
-  console.log('coach advanced to', step);
-  if (step === '1/7') errors.push('coach never registered that the player moved');
-}
+const step = await coachStep();
+console.log('coach advanced to', step);
+if (!step || step === '1/7') errors.push('coach never registered that the player moved');
 
 // Let the match run so the bot and unit AI actually exercise themselves.
 await page.waitForTimeout(6000);
