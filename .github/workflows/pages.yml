@@ -1,8 +1,12 @@
 # Publishes the game to GitHub Pages so it can be opened from a phone by link.
 #
-# No setup required: configure-pages is asked to enable Pages itself. If that
-# is blocked by org policy, a repo admin can do it by hand under
-# Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
+# ONE-TIME SETUP, by a repo admin:
+#   Settings -> Pages -> Build and deployment -> Source: "GitHub Actions"
+#
+# `enablement: true` below asks the action to do that itself, but the Actions
+# token is not permitted to create a Pages site ("Resource not accessible by
+# integration"), so the switch has to be flipped by a human once. Every push
+# after that deploys on its own.
 name: Deploy to Pages
 
 on:
