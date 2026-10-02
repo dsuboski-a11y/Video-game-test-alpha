@@ -1,8 +1,8 @@
 # Publishes the game to GitHub Pages so it can be opened from a phone by link.
 #
-# One-time setup by a repo admin: Settings -> Pages -> Build and deployment ->
-# Source: "GitHub Actions". Nothing else; this workflow does the rest on every
-# push.
+# No setup required: configure-pages is asked to enable Pages itself. If that
+# is blocked by org policy, a repo admin can do it by hand under
+# Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
 name: Deploy to Pages
 
 on:
@@ -38,7 +38,11 @@ jobs:
       # self-contained file, so the deploy carries both the normal site and a
       # standalone copy at /eisenkrieg.html.
       - run: npm run single
+      # enablement turns Pages on via the API, so nobody has to find the
+      # setting by hand. It needs the pages:write permission granted above.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

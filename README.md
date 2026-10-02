@@ -14,9 +14,9 @@ and balance).
 
 ## Send it to someone
 
-Pushing to this branch deploys the game to GitHub Pages automatically. A repo
-admin enables it once: **Settings → Pages → Build and deployment → Source:
-GitHub Actions**. After the next push the game lives at
+Pushing to this branch deploys the game to GitHub Pages automatically — the
+workflow turns Pages on itself, so there is nothing to configure. The game
+lives at
 
 ```
 https://<owner>.github.io/<repo>/
